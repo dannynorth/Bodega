@@ -2,10 +2,10 @@ import XCTest
 @testable import Bodega
 
 final class SQLiteStorageEngineTests: XCTestCase {
-    private var storage: SQLiteStorageEngine!
+    private var storage: Legacy.SQLiteStorageEngine!
 
     override func setUp() async throws {
-        storage = SQLiteStorageEngine(directory: .temporary(appendingPath: "Tests"))
+        storage = Legacy.SQLiteStorageEngine(directory: .temporary(appendingPath: "Tests"))
 
         try await storage.removeAllData()
     }
@@ -30,7 +30,7 @@ final class SQLiteStorageEngineTests: XCTestCase {
         let itemCount = await storage.keyCount()
         XCTAssertEqual(itemCount, 4)
 
-        let readKeysAndObjects: [(key: CacheKey, data: Data)] = await storage.readAllDataAndKeys()
+        let readKeysAndObjects: [(key: Legacy.CacheKey, data: Data)] = await storage.readAllDataAndKeys()
             .sorted(by: { String(data: $0.data, encoding: .utf8)! < String(data: $1.data, encoding: .utf8)! })
 
         XCTAssertEqual(Self.storedKeysAndData.map(\.key), readKeysAndObjects.map(\.key))
@@ -56,7 +56,7 @@ final class SQLiteStorageEngineTests: XCTestCase {
         let keyCount = await storage.keyCount()
         XCTAssertEqual(keyCount, 10)
 
-        let firstTwoValues = await storage.read(keys: [CacheKey(verbatim: "0"), CacheKey(verbatim: "1")])
+        let firstTwoValues = await storage.read(keys: [Legacy.CacheKey(verbatim: "0"), Legacy.CacheKey(verbatim: "1")])
         let firstTwoStrings = firstTwoValues.map({ String(data: $0, encoding: .utf8) })
 
         XCTAssertEqual(firstTwoStrings, [
@@ -74,8 +74,8 @@ final class SQLiteStorageEngineTests: XCTestCase {
 
         // Testing that the keys returned are correct
         XCTAssertEqual(lastTwoKeysAndData.map(\.key), [
-            CacheKey(verbatim: "8"),
-            CacheKey(verbatim: "9"),
+            Legacy.CacheKey(verbatim: "8"),
+            Legacy.CacheKey(verbatim: "9"),
         ])
 
         // Testing that the data returned is correct
@@ -90,7 +90,7 @@ final class SQLiteStorageEngineTests: XCTestCase {
         let allDataAndKeys = await storage.readAllDataAndKeys()
             .sorted(by: { $0.key.value > $1.key.value })
         
-        let goodAndBadKeys = (0 ..< 10).reversed().map({ CacheKey(verbatim: "\($0)") })
+        let goodAndBadKeys = (0 ..< 10).reversed().map({ Legacy.CacheKey(verbatim: "\($0)") })
         let validDataAndKeys = await storage.readDataAndKeys(keys: goodAndBadKeys)
             .sorted(by: { $0.key.value > $1.key.value })
         
@@ -139,9 +139,9 @@ final class SQLiteStorageEngineTests: XCTestCase {
             keysDerivedFromKeysAndData[5],
             keysDerivedFromKeysAndData[9],
         ], [
-            CacheKey(verbatim: "0"),
-            CacheKey(verbatim: "5"),
-            CacheKey(verbatim: "9"),
+            Legacy.CacheKey(verbatim: "0"),
+            Legacy.CacheKey(verbatim: "5"),
+            Legacy.CacheKey(verbatim: "9"),
         ])
 
         XCTAssertEqual([
@@ -156,7 +156,7 @@ final class SQLiteStorageEngineTests: XCTestCase {
     }
 
     func testReadingMissingData() async throws {
-        let readData = await storage.read(key: CacheKey(verbatim: "fake-key"))
+        let readData = await storage.read(key: Legacy.CacheKey(verbatim: "fake-key"))
         XCTAssertNil(readData)
     }
 
@@ -197,7 +197,7 @@ final class SQLiteStorageEngineTests: XCTestCase {
 
     func testRemovingNonExistentObjectDoesNotError() async throws {
         try await storage.write(Self.testData, key: Self.testCacheKey)
-        try await storage.remove(key: CacheKey(verbatim: "alternative-test-key"))
+        try await storage.remove(key: Legacy.CacheKey(verbatim: "alternative-test-key"))
 
         let readData = await storage.read(key: Self.testCacheKey)
         XCTAssertEqual(readData, Self.testData)
@@ -288,19 +288,19 @@ final class SQLiteStorageEngineTests: XCTestCase {
 
 private extension SQLiteStorageEngineTests {
     static let testData = Data("Test".utf8)
-    static let testCacheKey = CacheKey(verbatim: "test-key")
+    static let testCacheKey = Legacy.CacheKey(verbatim: "test-key")
 
-    static let storedKeysAndData: [(key: CacheKey, data: Data)] = [
-        (CacheKey(verbatim: "1"), Data("Value 1".utf8)),
-        (CacheKey(verbatim: "2"), Data("Value 2".utf8)),
-        (CacheKey(verbatim: "3"), Data("Value 3".utf8)),
-        (CacheKey(verbatim: "4"), Data("Value 4".utf8))
+    static let storedKeysAndData: [(key: Legacy.CacheKey, data: Data)] = [
+        (Legacy.CacheKey(verbatim: "1"), Data("Value 1".utf8)),
+        (Legacy.CacheKey(verbatim: "2"), Data("Value 2".utf8)),
+        (Legacy.CacheKey(verbatim: "3"), Data("Value 3".utf8)),
+        (Legacy.CacheKey(verbatim: "4"), Data("Value 4".utf8))
     ]
 
     func writeItemsToDatabase(count: Int) async throws {
         for i in 0..<count {
             // This encoding could fail in some use cases but we're going to use very simple strings for testing
-            try await storage.write("Value \(i)".data(using: .utf8)!, key: CacheKey(verbatim: "\(i)"))
+            try await storage.write("Value \(i)".data(using: .utf8)!, key: Legacy.CacheKey(verbatim: "\(i)"))
         }
     }
 }

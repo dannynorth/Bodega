@@ -1,4 +1,5 @@
 import Foundation
+import Combine // for TopLevel(Encoder|Decoder)
 
 /// A unified layer over a ``StorageEngine`` primitives, allowing you to read, write, and save Swift objects.
 ///
@@ -12,156 +13,116 @@ import Foundation
 /// ```
 /// SQLiteStorageEngine(directory: .defaultStorageDirectory(appendingPath: "Assets"))
 /// ```
-public actor ObjectStorage<Object: Codable> {
-    private let storage: StorageEngine
+public actor ObjectStorage<Key: StorageKey, Value: Codable>: StorageEngine {
+    private let storage: any StorageEngine<Key, Data>
 
     // A property for performance reasons, to avoid creating a new encoder on every write, N times for array-based methods.
-    private let encoder = JSONEncoder()
+    private let encode: (Value) throws -> Data
 
     // A property for performance reasons, to avoid creating a new decoder on every read, N times for array-based methods.
-    private let decoder = JSONDecoder()
+    private let decode: (Data) throws -> Value
 
     /// Initializes a new ``ObjectStorage`` object for persisting `Object`s.
     /// - Parameter storage: A ``StorageEngine`` to initialize an ``ObjectStorage`` instance with.
-    public init(storage: StorageEngine) {
+    public init(storage: any StorageEngine<Key, Data>) {
+        self.init(storage: storage, encoder: JSONEncoder(), decoder: JSONDecoder())
+    }
+    
+    public init<E: TopLevelEncoder, D: TopLevelDecoder>(storage: any StorageEngine<Key, Data>, encoder: E, decoder: D) where E.Output == Data, D.Input == Data {
         self.storage = storage
+        self.encode = { try encoder.encode($0) }
+        self.decode = { try decoder.decode(Value.self, from: $0) }
     }
-
-    /// Writes an `Object` based on the associated ``CacheKey``.
+    
+    /// Writes a `Value` based on the associated `Key`.
     /// - Parameters:
-    ///   - object: The object being stored.
-    ///   - key: A ``CacheKey`` for matching an `Object`.
-    public func store(_ object: Object, forKey key: CacheKey) async throws {
-        let data = try self.encoder.encode(object)
-
-        return try await storage.write(data, key: key)
+    ///   - value: The object being stored.
+    ///   - key: A ``Key`` for matching a `Value`.
+    public func write(_ value: Value, key: Key) async throws {
+        let data = try self.encode(value)
+        try await storage.write(data, key: key)
     }
-
-    /// Writes an array of `[Object]`s based on the associated ``CacheKey`` passed in the tuple.
-    /// - Parameters:
-    ///   - objectsAndKeys: An array of `[(CacheKey, Object)]` to store
-    ///   multiple objects with their associated keys at once.
-    public func store(_ objectsAndKeys: [(key: CacheKey, object: Object)]) async throws {
-        let dataAndKeys = try objectsAndKeys.map({ try ($0.key, self.encoder.encode($0.object)) })
-
-        try await storage.write(dataAndKeys)
+    
+    public func write(_ keysAndValues: [(key: Key, value: Value)]) async throws {
+        let keysAndDatas = try keysAndValues.map { key, value in
+            let data = try self.encode(value)
+            return (key, data)
+        }
+        try await storage.write(keysAndDatas)
     }
-
+    
     /// Reads an `Object` based on the associated ``CacheKey``.
     /// - Parameters:
     ///   - key: A ``CacheKey`` for matching an `Object`.
     /// - Returns: The object stored if it exists, nil if there is no `Object` stored for the ``CacheKey``.
-    public func object(forKey key: CacheKey) async -> Object? {
-        guard let data = await storage.read(key: key) else { return nil }
-
-        return try? self.decoder.decode(Object.self, from: data)
+    
+    /// Reads a `Value` based on the associated `Key`
+    /// - Parameter key: A `Key` for matching a `Value`
+    /// - Returns: The value if it exists, `nil` if there is no `Value` stored for the `Key`
+    /// - Throws: May throw an error if an error occurred reading the key
+    public func read(key: Key) async throws -> Value? {
+        guard let data = try await storage.read(key: key) else {
+            return nil
+        }
+        return try self.decode(data)
     }
-
-    /// Reads `Object`s based on the associated array of ``CacheKey``s provided as a parameter.
-    /// - Parameters:
-    ///   - keys: A `[CacheKey]` for matching multiple `Object`s.
-    /// - Returns: An array of `[Object]`s stored if the ``CacheKey``s exist,
-    /// and an `[]` if there are no `Object`s matching the `keys` passed in.
-    public func objects(forKeys keys: [CacheKey]) async -> [Object] {
-        let dataItems = await storage.read(keys: keys)
-
-        do {
-            return try dataItems.map({ try self.decoder.decode(Object.self, from: $0) })
-        } catch {
-            return []
+    
+    public func readKeysAndValues(keys: [Key]) async throws -> [(key: Key, value: Value)] {
+        let keysAndDatas = try await storage.readKeysAndValues(keys: keys)
+        return try keysAndDatas.map { key, data in
+            let value = try self.decode(data)
+            return (key, value)
         }
     }
-
-    /// Reads `Object`s based on the associated array of ``CacheKey``s provided as a parameter
-    /// and returns an array `[(CacheKey, Object)]` associated with the passed in ``CacheKey``s.
-    ///
-    /// This method returns the ``CacheKey`` and `Object` together in a tuple of `[(CacheKey, Object)]`
-    /// allowing you to know which ``CacheKey`` led to a specific `Object` being retrieved.
-    /// This can be useful in allowing manual iteration over `Object`s, but if you don't need to know
-    /// which ``CacheKey`` that led to an `Object` being retrieved you can use ``objects(forKeys:)`` instead.
-    /// - Parameters:
-    ///   - keys: A `[CacheKey]` for matching multiple `Object`s.
-    /// - Returns: An array of `[(CacheKey, Object)]` read if it exists,
-    /// and an empty array if there are no `Objects`s matching the `keys` passed in.
-    public func objectsAndKeys(keys: [CacheKey]) async -> [(key: CacheKey, object: Object)] {
-        var objectsAndKeys: [(key: CacheKey, object: Object)] = []
-
-        for key in keys {
-            if let object = await self.object(forKey: key) {
-                objectsAndKeys.append((key, object))
-            }
+    
+    public func readAllValues() async throws -> [Value] {
+        let datas = try await storage.readAllValues()
+        return try datas.map { data in
+            return try self.decode(data)
         }
-
-        return objectsAndKeys
     }
-
-    /// Reads all `[Object]` objects.
-    /// - Returns: An array of `[Object]`s contained in a directory.
-    public func allObjects() async -> [Object] {
-        let allKeys = await self.allKeys()
-        return await self.objects(forKeys: allKeys)
+    
+    public func readAllKeysAndValues() async throws -> [(key: Key, value: Value)] {
+        let keysAndDatas = try await storage.readAllKeysAndValues()
+        return try keysAndDatas.map { key, data in
+            let value = try self.decode(data)
+            return (key, value)
+        }
     }
-
-    /// Reads all of the objects and returns an array
-    /// of `[(CacheKey, Object)]` associated with the ``CacheKey``.
-    ///
-    /// This method returns the ``CacheKey`` and `Object` together in an array of `[(CacheKey, Object)]`
-    /// allowing you to know which ``CacheKey`` led to a specific `Object` item being retrieved.
-    /// This can be useful in allowing manual iteration over `Object`s, but if you
-    /// don't need to know which ``CacheKey`` led to an `Object` being retrieved
-    /// you can use ``allObjects()`` instead.
-    /// - Returns: An array of `Object`s and it's associated ``CacheKey``s contained in a directory.
-    public func allObjectsAndKeys() async -> [(key: CacheKey, object: Object)] {
-        let allKeys = await self.allKeys()
-        return await self.objectsAndKeys(keys: allKeys)
-    }
-
-    /// Removes an `Object` based on the the associated ``CacheKey``.
-    /// - Parameters:
-    ///   - key: A ``CacheKey`` for matching an `Object`.
-    public func removeObject(forKey key: CacheKey) async throws {
+    
+    public func remove(key: Key) async throws {
         try await storage.remove(key: key)
     }
-
-    /// Removes `[Object]`s from the underlying Storage based on the associated array of ``CacheKey``s provided as a parameter.
-    /// - Parameters:
-    ///   - keys: A `[CacheKey]` for matching multiple `Object`s.
-    public func removeObject(forKeys keys: [CacheKey]) async throws {
-        for key in keys {
-            try await storage.remove(key: key)
-        }
+    
+    public func remove(keys: [Key]) async throws {
+        try await storage.remove(keys: keys)
     }
-
-    /// Removes all of the `Object`s.
-    public func removeAllObjects() async throws {
-        try await storage.removeAllData()
+    
+    public func removeAllValues() async throws {
+        try await storage.removeAllValues()
     }
-
-    /// Iterates through a directory to find the total number of objects.
-    /// - Returns: The object/key count.
-    public func keyCount() async -> Int {
-        return await storage.keyCount()
+    
+    public func keyExists(_ key: Key) async throws -> Bool {
+        return try await storage.keyExists(key)
     }
-
-    /// Iterates through the ``ObjectStorage`` to find all of the `Object`s keys.
-    /// - Returns: An array of the keys contained in a directory.
-    public func allKeys() async -> [CacheKey] {
-        return await storage.allKeys()
+    
+    public func keysExist(_ keys: [Key]) async throws -> [Key] {
+        return try await storage.keysExist(keys)
     }
-
-    /// Returns the date of creation for the object represented by the ``CacheKey``, if it exists.
-    /// - Parameters:
-    ///   - key: A ``CacheKey`` for matching an `Object`.
-    /// - Returns: The creation date of the `Object` if it exists, nil if there is no `Object` stored for the ``CacheKey``.
-    public func createdAt(forKey key: CacheKey) async -> Date? {
-        return await storage.createdAt(key: key)
+    
+    public func keyCount() async throws -> Int {
+        return try await storage.keyCount()
     }
-
-    /// Returns the modification date for the object represented by the ``CacheKey``, if it exists.
-    /// - Parameters:
-    ///   - key: A ``CacheKey`` for matching an `Object`.
-    /// - Returns: The modification date of the object if it exists, nil if there is no object stored for the ``CacheKey``.
-    public func updatedAt(forKey key: CacheKey) async -> Date? {
-        return await storage.updatedAt(key: key)
+    
+    public func allKeys() async throws -> [Key] {
+        return try await storage.allKeys()
+    }
+    
+    public func createdAt(key: Key) async throws -> Date? {
+        return try await storage.createdAt(key: key)
+    }
+    
+    public func updatedAt(key: Key) async throws -> Date? {
+        return try await storage.updatedAt(key: key)
     }
 }

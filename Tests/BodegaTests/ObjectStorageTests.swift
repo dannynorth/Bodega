@@ -4,9 +4,7 @@ import XCTest
 // Testing an ObjectStorage instance that's backed by a SQLiteStorageEngine
 final class SQLiteStorageEngineBackedObjectStorageTests: ObjectStorageTests {
     override func setUp() async throws {
-        storage = ObjectStorage(
-            storage: SQLiteStorageEngine(directory: .temporary(appendingPath: "SQLiteTests"))!
-        )
+        storage = Legacy.ObjectStorage(storage: InMemoryStorage())
 
         try await storage.removeAllObjects()
     }
@@ -36,8 +34,8 @@ final class SQLiteStorageEngineBackedObjectStorageTests: ObjectStorageTests {
 // Testing an ObjectStorage instance that's backed by a DiskStorageEngine
 final class DiskStorageEngineBackedObjectStorageTests: ObjectStorageTests {
     override func setUp() async throws {
-        storage = ObjectStorage(
-            storage: DiskStorageEngine(directory: .temporary(appendingPath: "DiskStorageTests"))
+        storage = Legacy.ObjectStorage(
+            storage: Legacy.DiskStorageEngine(directory: .temporary(appendingPath: "DiskStorageTests"))
         )
 
         try await storage.removeAllObjects()
@@ -67,17 +65,17 @@ final class DiskStorageEngineBackedObjectStorageTests: ObjectStorageTests {
 }
 
 class ObjectStorageTests: XCTestCase {
-    fileprivate var storage: ObjectStorage<CodableObject>!
+    fileprivate var storage: Legacy.ObjectStorage<CodableObject>!
 
     // You should run SQLiteStorageEngineBackedObjectStorageTests and DiskStorageEngineBackedObjectStorageTests
     // but not ObjectStorageTests since it's only here for the purpose of shared code.
     // Since this can run on it's own, instead what we do is pick one of the two storages at random
     // and let the tests run, since they should pass anyhow as long as the storages work.
     override func setUp() async throws {
-        let diskStorageEngine = DiskStorageEngine(directory: .temporary(appendingPath: "FileSystemTests"))
-        let sqliteStorageEngine = SQLiteStorageEngine(directory: .temporary(appendingPath: "SQLiteTests"))!
+        let diskStorageEngine = Legacy.DiskStorageEngine(directory: .temporary(appendingPath: "FileSystemTests"))
+        let sqliteStorageEngine = Legacy.SQLiteStorageEngine(directory: .temporary(appendingPath: "SQLiteTests"))!
 
-        storage = ObjectStorage(
+        storage = Legacy.ObjectStorage(
             storage: [diskStorageEngine, sqliteStorageEngine].randomElement()!
         )
 
@@ -104,7 +102,7 @@ class ObjectStorageTests: XCTestCase {
         let objectCount = await storage.keyCount()
         XCTAssertEqual(objectCount, 4)
 
-        let readKeysAndObjects: [(key: CacheKey, object: CodableObject)] = await storage.allObjectsAndKeys()
+        let readKeysAndObjects: [(key: Legacy.CacheKey, object: CodableObject)] = await storage.allObjectsAndKeys()
             .sorted(by: { $0.object.value < $1.object.value })
 
         XCTAssertEqual(Self.storedKeysAndObjects.map(\.key), readKeysAndObjects.map(\.key))
@@ -124,7 +122,7 @@ class ObjectStorageTests: XCTestCase {
         XCTAssertEqual(keyCount, 10)
 
         // Read an array of objects
-        let objects: [CodableObject] = await storage.objects(forKeys: [CacheKey(verbatim: "0"), CacheKey(verbatim: "1")])
+        let objects: [CodableObject] = await storage.objects(forKeys: [Legacy.CacheKey(verbatim: "0"), Legacy.CacheKey(verbatim: "1")])
         let objectValues = objects.map(\.value)
 
         XCTAssertEqual(objectValues, [
@@ -138,12 +136,12 @@ class ObjectStorageTests: XCTestCase {
 
         let allKeys = await storage.allKeys().sorted(by: { $0.value < $1.value })
         let lastTwoKeys = Array(allKeys.suffix(2))
-        let lastTwoCacheKeysAndObjects: [(key: CacheKey, object: CodableObject)] = await storage.objectsAndKeys(keys: lastTwoKeys)
+        let lastTwoCacheKeysAndObjects: [(key: Legacy.CacheKey, object: CodableObject)] = await storage.objectsAndKeys(keys: lastTwoKeys)
 
         // Testing that the keys returned are correct
         XCTAssertEqual(lastTwoCacheKeysAndObjects.map(\.key), [
-            CacheKey(verbatim: "8"),
-            CacheKey(verbatim: "9"),
+            Legacy.CacheKey(verbatim: "8"),
+            Legacy.CacheKey(verbatim: "9"),
         ])
 
         // Testing that the objects returned are correct
@@ -158,7 +156,7 @@ class ObjectStorageTests: XCTestCase {
         let allDataAndKeys = await storage.allObjectsAndKeys()
             .sorted(by: { $0.key.value > $1.key.value })
         
-        let goodAndBadKeys = (0 ..< 10).reversed().map({ CacheKey(verbatim: "\($0)") })
+        let goodAndBadKeys = (0 ..< 10).reversed().map({ Legacy.CacheKey(verbatim: "\($0)") })
         let validObjectsAndKeys = await storage.objectsAndKeys(keys: goodAndBadKeys)
             .sorted(by: { $0.key.value > $1.key.value })
         
@@ -188,7 +186,7 @@ class ObjectStorageTests: XCTestCase {
     func testReadingAllObjectsAndKeysSucceeds() async throws {
         try await self.writeObjectsToDisk(count: 10)
 
-        let allKeysAndObjects: [(key: CacheKey, object: CodableObject)] = await storage.allObjectsAndKeys()
+        let allKeysAndObjects: [(key: Legacy.CacheKey, object: CodableObject)] = await storage.allObjectsAndKeys()
         XCTAssertEqual(allKeysAndObjects.count, 10)
 
         let keysDerivedFromKeysAndObjects = allKeysAndObjects.map(\.key)
@@ -202,9 +200,9 @@ class ObjectStorageTests: XCTestCase {
             keysDerivedFromKeysAndObjects[5],
             keysDerivedFromKeysAndObjects[9],
         ], [
-            CacheKey(verbatim: "0"),
-            CacheKey(verbatim: "5"),
-            CacheKey(verbatim: "9"),
+            Legacy.CacheKey(verbatim: "0"),
+            Legacy.CacheKey(verbatim: "5"),
+            Legacy.CacheKey(verbatim: "9"),
         ])
 
         XCTAssertEqual([
@@ -245,7 +243,7 @@ class ObjectStorageTests: XCTestCase {
             storedKeysAndData[2].key,
         ])
 
-        let allData: [(key: CacheKey, object: CodableObject)] = await storage.allObjectsAndKeys()
+        let allData: [(key: Legacy.CacheKey, object: CodableObject)] = await storage.allObjectsAndKeys()
         XCTAssertEqual(allData[0].key, storedKeysAndData[3].key)
         XCTAssertEqual(allData[0].object, storedKeysAndData[3].object)
 
@@ -253,7 +251,7 @@ class ObjectStorageTests: XCTestCase {
 
     func testInvalidRemoveErrors() async throws {
         try await storage.store(Self.testObject, forKey: Self.testCacheKey)
-        try await storage.removeObject(forKey: CacheKey("alternative-test-key"))
+        try await storage.removeObject(forKey: Legacy.CacheKey("alternative-test-key"))
 
         let readObject: CodableObject? = await storage.object(forKey: Self.testCacheKey)
         XCTAssertEqual(readObject, Self.testObject)
@@ -318,18 +316,18 @@ private struct CodableObject: Codable, Equatable {
 
 private extension ObjectStorageTests {
     static let testObject = CodableObject(value: "default-value")
-    static let testCacheKey = CacheKey("test-key")
+    static let testCacheKey = Legacy.CacheKey("test-key")
 
-    static let storedKeysAndObjects: [(key: CacheKey, object: CodableObject)] = [
-        (CacheKey(verbatim: "1"), CodableObject(value: "Value 1")),
-        (CacheKey(verbatim: "2"), CodableObject(value: "Value 2")),
-        (CacheKey(verbatim: "3"), CodableObject(value: "Value 3")),
-        (CacheKey(verbatim: "4"), CodableObject(value: "Value 4"))
+    static let storedKeysAndObjects: [(key: Legacy.CacheKey, object: CodableObject)] = [
+        (Legacy.CacheKey(verbatim: "1"), CodableObject(value: "Value 1")),
+        (Legacy.CacheKey(verbatim: "2"), CodableObject(value: "Value 2")),
+        (Legacy.CacheKey(verbatim: "3"), CodableObject(value: "Value 3")),
+        (Legacy.CacheKey(verbatim: "4"), CodableObject(value: "Value 4"))
     ]
 
     func writeObjectsToDisk(count: Int) async throws {
         for i in 0..<count {
-            try await storage.store(CodableObject(value: "Value \(i)"), forKey: CacheKey(verbatim: "\(i)"))
+            try await storage.store(CodableObject(value: "Value \(i)"), forKey: Legacy.CacheKey(verbatim: "\(i)"))
         }
     }
 }

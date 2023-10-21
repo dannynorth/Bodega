@@ -1,9 +1,11 @@
-public extension SQLiteStorageEngine {
+import SQLite
+
+public extension SQLiteStorageEngine where KeyType == String {
     /// An ``SQLiteStorageEngine`` located in the platform-specific default storage directory.
     ///
     /// Equivalent to:
     /// `SQLiteStorageEngine(directory: .defaultStorageDirectory(appendingPath: "Data"))`
-    static var `default`: SQLiteStorageEngine {
+    static var `default`: SQLiteStorageEngine<String> {
         self.default(appendingPath: "Data")
     }
 

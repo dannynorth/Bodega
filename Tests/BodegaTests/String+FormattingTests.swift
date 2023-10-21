@@ -5,7 +5,7 @@ final class StringFormattingTests: XCTestCase {
     func testCacheKeyURLHashing() {
         let redPandaClubHash = "37E97C2D-25C0-19AE-755D-FC39211AEE32"
         let url = URL(string: "https://www.redpanda.club")!
-        let cacheKey = CacheKey(url: url)
+        let cacheKey = Legacy.CacheKey(url: url)
 
         XCTAssertEqual(cacheKey.value, redPandaClubHash)
 
