@@ -24,12 +24,12 @@ public actor ObjectStorageEngine<Key: StorageKey, Value: Codable & Sendable>: St
 
     /// Initializes a new ``ObjectStorage`` object for persisting `Object`s.
     /// - Parameter storage: A ``StorageEngine`` to initialize an ``ObjectStorage`` instance with.
-    public init(storage: any StorageEngine<Key, Data>) {
+    public init<S: StorageEngine>(storage: S) where S.Key.KeyType == Key.KeyType, S.Value == Data {
         self.init(storage: storage, encoder: JSONEncoder(), decoder: JSONDecoder())
     }
     
-    public init<E: TopLevelEncoder, D: TopLevelDecoder>(storage: any StorageEngine<Key, Data>, encoder: E, decoder: D) where E.Output == Data, D.Input == Data {
-        self.storage = storage
+    public init<S: StorageEngine, E: TopLevelEncoder, D: TopLevelDecoder>(storage: S, encoder: E, decoder: D) where S.Key.KeyType == Key.KeyType, S.Value == Data, E.Output == Data, D.Input == Data {
+        self.storage = KeyErasedStorageEngine(storage, keyType: Key.self)
         self.encode = { try encoder.encode($0) }
         self.decode = { try decoder.decode(Value.self, from: $0) }
     }
