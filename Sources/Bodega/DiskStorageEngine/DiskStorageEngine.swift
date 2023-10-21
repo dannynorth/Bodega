@@ -14,8 +14,7 @@ import Foundation
 /// If performance is important ``Bodega`` ships ``SQLiteStorageEngine``, and that is the recommended
 /// default ``StorageEngine``. If you have your own persistence layer such as Realm, Core Data, etc,
 /// you can easily build your own ``StorageEngine`` to plug into ``ObjectStorage``.
-public actor DiskStorageEngine: StorageEngine {
-    public typealias Key = DiskStorageKey
+public actor DiskStorageEngine<Key: StorageKey>: StorageEngine where Key.KeyType == String {
     public typealias Value = Data
     
     /// A directory on the filesystem where your ``StorageEngine``s data will be stored.
@@ -28,12 +27,30 @@ public actor DiskStorageEngine: StorageEngine {
     public init(directory: FileManager.Directory) {
         self.directory = directory
     }
+    
+    private func sanitize(_ key: Key) -> String {
+        return Data(key.rawKey.utf8)
+            .base64EncodedString()
+            .replacingOccurrences(of: "=", with: "-")
+    }
+    
+    private func buildKey(_ sanitized: String) -> Key? {
+        guard let data = Data(base64Encoded: sanitized.replacingOccurrences(of: "-", with: "=")) else {
+            return nil
+        }
+        
+        guard let plainText = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        
+        return Key(rawKey: plainText)
+    }
 
-    /// Writes `Data` to disk based on the associated ``DiskStorageKey``.
+    /// Writes `Data` to disk based on the associated ``Key``.
     /// - Parameters:
     ///   - data: The `Data` being stored to disk.
-    ///   - key: A ``DiskStorageKey`` for matching `Data` to a location on disk.
-    public func write(_ value: Data, key: DiskStorageKey) async throws {
+    ///   - key: A ``Key`` for matching `Data` to a location on disk.
+    public func write(_ value: Data, key: Key) async throws {
         let fileURL = self.concatenatedPath(key: key)
         let folderURL = fileURL.deletingLastPathComponent()
 
@@ -44,38 +61,38 @@ public actor DiskStorageEngine: StorageEngine {
         try value.write(to: fileURL, options: .atomic)
     }
 
-    /// Writes an array of `Data` items to disk based on the associated ``DiskStorageKey`` passed in the tuple.
+    /// Writes an array of `Data` items to disk based on the associated ``Key`` passed in the tuple.
     /// - Parameters:
-    ///   - dataAndKeys: An array of the `[(DiskStorageKey, Data)]` to store
+    ///   - dataAndKeys: An array of the `[(Key, Data)]` to store
     ///   multiple `Data` items with their associated keys at once.
-    public func write(_ keysAndValues: [(key: DiskStorageKey, value: Data)]) async throws {
+    public func write(_ keysAndValues: [(key: Key, value: Data)]) async throws {
         for (key, data) in keysAndValues {
             try await self.write(data, key: key)
         }
     }
 
-    /// Reads `Data` from disk based on the associated ``DiskStorageKey``.
+    /// Reads `Data` from disk based on the associated ``Key``.
     /// - Parameters:
-    ///   - key: A ``DiskStorageKey`` for matching `Data` to a location on disk.
-    /// - Returns: The `Data` stored on disk if it exists, nil if there is no `Data` stored for the `DiskStorageKey`.
-    public func read(key: DiskStorageKey) async throws -> Data? {
+    ///   - key: A ``Key`` for matching `Data` to a location on disk.
+    /// - Returns: The `Data` stored on disk if it exists, nil if there is no `Data` stored for the `Key`.
+    public func read(key: Key) async throws -> Data? {
         return try Data(contentsOf: self.concatenatedPath(key: key))
     }
 
-    /// Reads `Data` from disk based on the associated array of ``DiskStorageKey``s provided as a parameter
-    /// and returns an array `[(DiskStorageKey, Data)]` associated with the passed in ``DiskStorageKey``s.
+    /// Reads `Data` from disk based on the associated array of ``Key``s provided as a parameter
+    /// and returns an array `[(Key, Data)]` associated with the passed in ``Key``s.
     ///
-    /// This method returns the ``DiskStorageKey`` and `Data` together in a tuple of `[(DiskStorageKey, Data)]`
-    /// allowing you to know which ``DiskStorageKey`` led to a specific `Data` item being retrieved.
+    /// This method returns the ``Key`` and `Data` together in a tuple of `[(Key, Data)]`
+    /// allowing you to know which ``Key`` led to a specific `Data` item being retrieved.
     /// This can be useful in allowing manual iteration over data, but if you don't need
-    /// to know which ``DiskStorageKey`` that led to a piece of `Data` being retrieved
+    /// to know which ``Key`` that led to a piece of `Data` being retrieved
     ///  you can use ``read(keys:)`` instead.
     /// - Parameters:
-    ///   - keys: A `[DiskStorageKey]` for matching multiple `Data` items.
-    /// - Returns: An array of `[(DiskStorageKey, Data)]` read from disk if the ``DiskStorageKey``s exist,
+    ///   - keys: A `[Key]` for matching multiple `Data` items.
+    /// - Returns: An array of `[(Key, Data)]` read from disk if the ``Key``s exist,
     /// and an empty array if there are no `Data` items matching the `keys` passed in.
-    public func readKeysAndValues(keys: [DiskStorageKey]) async throws -> [(key: DiskStorageKey, value: Data)] {
-        var dataAndKeys: [(key: DiskStorageKey, value: Data)] = []
+    public func readKeysAndValues(keys: [Key]) async throws -> [(key: Key, value: Data)] {
+        var dataAndKeys: [(key: Key, value: Data)] = []
 
         for key in keys {
             if let data = try await self.read(key: key) {
@@ -94,23 +111,23 @@ public actor DiskStorageEngine: StorageEngine {
     }
 
     /// Reads all the `Data` located in the `directory` and returns an array
-    /// of `[(DiskStorageKey, Data)]` tuples associated with the ``DiskStorageKey``.
+    /// of `[(Key, Data)]` tuples associated with the ``Key``.
     ///
-    /// This method returns the ``DiskStorageKey`` and `Data` together in an array of `[(DiskStorageKey, Data)]`
-    /// allowing you to know which ``DiskStorageKey`` led to a specific `Data` item being retrieved.
+    /// This method returns the ``Key`` and `Data` together in an array of `[(Key, Data)]`
+    /// allowing you to know which ``Key`` led to a specific `Data` item being retrieved.
     /// This can be useful in allowing manual iteration over `Data` items, but if you don't need
-    /// to know which ``DiskStorageKey`` led to a piece of `Data` being retrieved
+    /// to know which ``Key`` led to a piece of `Data` being retrieved
     /// you can use ``readAllData()`` instead.
-    /// - Returns: An array of the `[Data]` and it's associated `DiskStorageKey`s contained in a directory.
-    public func readAllKeysAndValues() async throws -> [(key: DiskStorageKey, value: Data)] {
+    /// - Returns: An array of the `[Data]` and it's associated `Key`s contained in a directory.
+    public func readAllKeysAndValues() async throws -> [(key: Key, value: Data)] {
         let allKeys = try await self.allKeys()
         return try await self.readKeysAndValues(keys: allKeys)
     }
 
-    /// Removes `Data` from disk based on the associated ``DiskStorageKey``.
+    /// Removes `Data` from disk based on the associated ``Key``.
     /// - Parameters:
-    ///   - key: A ``DiskStorageKey`` for matching `Data` to a location on disk.
-    public func remove(key: DiskStorageKey) async throws {
+    ///   - key: A ``Key`` for matching `Data` to a location on disk.
+    public func remove(key: Key) async throws {
         do {
             try FileManager.default.removeItem(at: self.concatenatedPath(key: key))
         } catch CocoaError.fileNoSuchFile {
@@ -131,7 +148,7 @@ public actor DiskStorageEngine: StorageEngine {
         }
     }
     
-    public func remove(keys: [DiskStorageKey]) async throws {
+    public func remove(keys: [Key]) async throws {
         for key in keys {
             try await self.remove(key: key)
         }
@@ -144,7 +161,7 @@ public actor DiskStorageEngine: StorageEngine {
         }
     }
     
-    public func keysExist(_ keys: [DiskStorageKey]) async throws -> [DiskStorageKey] {
+    public func keysExist(_ keys: [Key]) async throws -> [Key] {
         let allKeys = try await self.allKeys()
         let keySet = Set(allKeys)
         return keys.filter({ keySet.contains($0) })
@@ -155,7 +172,7 @@ public actor DiskStorageEngine: StorageEngine {
     /// This implementation provides `O(1)` checking for the key's existence.
     /// - Parameter key: The key to check for existence.
     /// - Returns: If the key exists the function returns true, false if it does not.
-    public func keyExists(_ key: DiskStorageKey) async throws -> Bool {
+    public func keyExists(_ key: Key) async throws -> Bool {
         let fileURL = self.concatenatedPath(key: key)
         return Self.fileExists(atURL: fileURL)
     }
@@ -168,22 +185,22 @@ public actor DiskStorageEngine: StorageEngine {
 
     /// Iterates through a `directory` to find all of the keys.
     /// - Returns: An array of the keys contained in a directory.
-    public func allKeys() async throws -> [DiskStorageKey] {
+    public func allKeys() async throws -> [Key] {
         do {
             let directoryContents = try FileManager.default.contentsOfDirectory(at: self.directory.url, includingPropertiesForKeys: nil)
             let fileOnlyKeys = directoryContents.lazy.filter({ !$0.hasDirectoryPath }).map(\.lastPathComponent)
 
-            return fileOnlyKeys.compactMap { DiskStorageKey(sanitized: $0) }
+            return fileOnlyKeys.compactMap { self.buildKey($0) }
         } catch {
             return []
         }
     }
 
-    /// Returns the date of creation for the file represented by the ``DiskStorageKey``, if it exists.
+    /// Returns the date of creation for the file represented by the ``Key``, if it exists.
     /// - Parameters:
-    ///   - key: A ``DiskStorageKey`` for matching `Data` to a location on disk.
-    /// - Returns: The creation date of the `Data` on disk if it exists, nil if there is no `Data` stored for the `DiskStorageKey`.
-    public func createdAt(key: DiskStorageKey) async throws -> Date? {
+    ///   - key: A ``Key`` for matching `Data` to a location on disk.
+    /// - Returns: The creation date of the `Data` on disk if it exists, nil if there is no `Data` stored for the `Key`.
+    public func createdAt(key: Key) async throws -> Date? {
         do {
             return try self.concatenatedPath(key: key)
                 .resourceValues(forKeys: [.creationDateKey]).creationDate
@@ -195,11 +212,11 @@ public actor DiskStorageEngine: StorageEngine {
         }
     }
 
-    /// Returns the updatedAt date for the file represented by the ``DiskStorageKey``, if it exists.
+    /// Returns the updatedAt date for the file represented by the ``Key``, if it exists.
     /// - Parameters:
-    ///   - key: A ``DiskStorageKey`` for matching `Data` to a location on disk.
-    /// - Returns: The updatedAt date of the `Data` on disk if it exists, nil if there is no `Data` stored for the ``DiskStorageKey``.
-    public func updatedAt(key: DiskStorageKey) async throws -> Date? {
+    ///   - key: A ``Key`` for matching `Data` to a location on disk.
+    /// - Returns: The updatedAt date of the `Data` on disk if it exists, nil if there is no `Data` stored for the ``Key``.
+    public func updatedAt(key: Key) async throws -> Date? {
         do {
             return try self.concatenatedPath(key: key)
                 .resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
@@ -211,11 +228,11 @@ public actor DiskStorageEngine: StorageEngine {
         }
     }
 
-    /// Returns the last access date of the file for the ``DiskStorageKey``, if it exists.
+    /// Returns the last access date of the file for the ``Key``, if it exists.
     /// - Parameters:
-    ///   - key: A ``DiskStorageKey`` for matching `Data` to a location on disk.
-    /// - Returns: The last access date of the `Data` on disk if it exists, nil if there is no `Data` stored for the ``DiskStorageKey``.
-    public func lastAccessed(key: DiskStorageKey) async throws -> Date? {
+    ///   - key: A ``Key`` for matching `Data` to a location on disk.
+    /// - Returns: The last access date of the `Data` on disk if it exists, nil if there is no `Data` stored for the ``Key``.
+    public func lastAccessed(key: Key) async throws -> Date? {
         do {
             return try self.concatenatedPath(key: key)
                 .resourceValues(forKeys: [.contentAccessDateKey]).contentAccessDate
@@ -251,7 +268,8 @@ private extension DiskStorageEngine {
         return exists == true && isDirectory.boolValue == false
     }
 
-    func concatenatedPath(key: DiskStorageKey) -> URL {
-        return self.directory.url.appendingPathComponent(key.sanitizedValue)
+    func concatenatedPath(key: Key) -> URL {
+        let sanitizedName = self.sanitize(key)
+        return self.directory.url.appendingPathComponent(sanitizedName)
     }
 }
