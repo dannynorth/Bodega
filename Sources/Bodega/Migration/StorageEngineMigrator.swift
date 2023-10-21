@@ -42,10 +42,12 @@ public actor StorageEngineMigrator<Old: StorageEngine, New: StorageEngine> {
         self.init(from: old, to: new, migrateKey: { $0 }, migrateValue: migrateValue)
     }
     
+    @_disfavoredOverload
     public init(from old: Old, to new: New) where Old.Key.KeyType == New.Key.KeyType, Old.Value == New.Value {
         self.init(from: old, to: new, migrateKey: { New.Key($0) }, migrateValue: { $0 })
     }
     
+    @_disfavoredOverload
     public init(from old: Old, to new: New, migrateValue: @escaping (Old.Value) -> New.Value) where Old.Key.KeyType == New.Key.KeyType {
         self.init(from: old, to: new, migrateKey: { New.Key($0) }, migrateValue: migrateValue)
     }
