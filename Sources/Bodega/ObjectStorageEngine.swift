@@ -13,7 +13,7 @@ import Combine // for TopLevel(Encoder|Decoder)
 /// ```
 /// SQLiteStorageEngine(directory: .defaultStorageDirectory(appendingPath: "Assets"))
 /// ```
-public actor ObjectStorage<Key: StorageKey, Value: Codable>: StorageEngine {
+public actor ObjectStorageEngine<Key: StorageKey, Value: Codable>: StorageEngine {
     private let storage: any StorageEngine<Key, Data>
 
     // A property for performance reasons, to avoid creating a new encoder on every write, N times for array-based methods.
