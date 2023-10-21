@@ -4,7 +4,7 @@ import XCTest
 // Testing an ObjectStorage instance that's backed by a SQLiteStorageEngine
 final class SQLiteStorageEngineBackedObjectStorageTests: ObjectStorageTests {
     override func setUp() async throws {
-        storage = Legacy.ObjectStorage(storage: InMemoryStorage())
+        storage = Legacy.ObjectStorage(storage: InMemoryStorageEngine())
 
         try await storage.removeAllObjects()
     }
