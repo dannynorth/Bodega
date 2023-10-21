@@ -1,7 +1,7 @@
 import XCTest
 @testable import Bodega
 
-final class StringFormattingTests: XCTestCase {
+final class LegacyStringFormattingTests: XCTestCase {
     func testCacheKeyURLHashing() {
         let redPandaClubHash = "37E97C2D-25C0-19AE-755D-FC39211AEE32"
         let url = URL(string: "https://www.redpanda.club")!

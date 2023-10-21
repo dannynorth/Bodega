@@ -2,7 +2,7 @@ import XCTest
 @testable import Bodega
 
 // Testing an ObjectStorage instance that's backed by a SQLiteStorageEngine
-final class SQLiteStorageEngineBackedObjectStorageTests: ObjectStorageTests {
+final class LegacySQLiteStorageEngineBackedObjectStorageTests: LegacyObjectStorageTests {
     override func setUp() async throws {
         storage = Legacy.ObjectStorage(storage: InMemoryStorageEngine())
 
@@ -32,7 +32,7 @@ final class SQLiteStorageEngineBackedObjectStorageTests: ObjectStorageTests {
 }
 
 // Testing an ObjectStorage instance that's backed by a DiskStorageEngine
-final class DiskStorageEngineBackedObjectStorageTests: ObjectStorageTests {
+final class LegacyDiskStorageEngineBackedObjectStorageTests: LegacyObjectStorageTests {
     override func setUp() async throws {
         storage = Legacy.ObjectStorage(
             storage: Legacy.DiskStorageEngine(directory: .temporary(appendingPath: "DiskStorageTests"))
@@ -64,7 +64,7 @@ final class DiskStorageEngineBackedObjectStorageTests: ObjectStorageTests {
     }
 }
 
-class ObjectStorageTests: XCTestCase {
+class LegacyObjectStorageTests: XCTestCase {
     fileprivate var storage: Legacy.ObjectStorage<CodableObject>!
 
     // You should run SQLiteStorageEngineBackedObjectStorageTests and DiskStorageEngineBackedObjectStorageTests
@@ -314,7 +314,7 @@ private struct CodableObject: Codable, Equatable {
     let value: String
 }
 
-private extension ObjectStorageTests {
+private extension LegacyObjectStorageTests {
     static let testObject = CodableObject(value: "default-value")
     static let testCacheKey = Legacy.CacheKey("test-key")
 

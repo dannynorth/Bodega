@@ -1,7 +1,7 @@
 import XCTest
 @testable import Bodega
 
-final class CacheKeyTests: XCTestCase {
+final class LegacyCacheKeyTests: XCTestCase {
     func testCacheKeyValues() {
         let cacheKey = Legacy.CacheKey(verbatim: "cache-key")
         let hashedCacheKey = Legacy.CacheKey("cache-key")
