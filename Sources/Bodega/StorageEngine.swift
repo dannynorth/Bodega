@@ -53,22 +53,7 @@ public protocol StorageEngine<Key, Value>: Actor {
     func updatedAt(key: Key) async throws -> Date?
 }
 
-public protocol StorageKey: Hashable, Sendable { 
-    associatedtype KeyType: Hashable & Sendable
-    
-    var rawKey: KeyType { get }
-    
-    init(rawKey: KeyType)
-}
-
-extension StorageKey {
-    
-    public init<Other: StorageKey>(_ other: Other) where Other.KeyType == KeyType {
-        self.init(rawKey: other.rawKey)
-    }
-    
-}
-
+/*
 // These default implementations make it easier to implement the `StorageEngine` protocol.
 // Some `StorageEngine`s such as ``SQLiteStorageEngine`` may want to implement the one-item
 // and array-based functions separately for optimization purposes, but these are safe defaults.
@@ -149,3 +134,4 @@ extension StorageEngine {
         return try await self.allKeys().count
     }
 }
+*/

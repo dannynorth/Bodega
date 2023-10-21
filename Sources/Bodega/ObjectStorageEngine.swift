@@ -21,13 +21,27 @@ public actor ObjectStorageEngine<Key: StorageKey, Value: Codable & Sendable>: St
 
     // A property for performance reasons, to avoid creating a new decoder on every read, N times for array-based methods.
     private let decode: (Data) throws -> Value
-
+    
     /// Initializes a new ``ObjectStorage`` object for persisting `Object`s.
     /// - Parameter storage: A ``StorageEngine`` to initialize an ``ObjectStorage`` instance with.
+    public init<S: StorageEngine>(storage: S) where S.Key == Key, S.Value == Data {
+        self.init(storage: storage, encoder: JSONEncoder(), decoder: JSONDecoder())
+    }
+    
+    public init<S: StorageEngine, E: TopLevelEncoder, D: TopLevelDecoder>(storage: S, encoder: E, decoder: D) where S.Key == Key, S.Value == Data, E.Output == Data, D.Input == Data {
+        self.storage = storage
+        self.encode = { try encoder.encode($0) }
+        self.decode = { try decoder.decode(Value.self, from: $0) }
+    }
+    
+    /// Initializes a new ``ObjectStorage`` object for persisting `Object`s.
+    /// - Parameter storage: A ``StorageEngine`` to initialize an ``ObjectStorage`` instance with.
+    @_disfavoredOverload
     public init<S: StorageEngine>(storage: S) where S.Key.KeyType == Key.KeyType, S.Value == Data {
         self.init(storage: storage, encoder: JSONEncoder(), decoder: JSONDecoder())
     }
     
+    @_disfavoredOverload
     public init<S: StorageEngine, E: TopLevelEncoder, D: TopLevelDecoder>(storage: S, encoder: E, decoder: D) where S.Key.KeyType == Key.KeyType, S.Value == Data, E.Output == Data, D.Input == Data {
         self.storage = KeyErasedStorageEngine(storage, keyType: Key.self)
         self.encode = { try encoder.encode($0) }
