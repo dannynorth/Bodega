@@ -29,13 +29,11 @@ import SQLite
 /// One alternative is to make the initializer `throw`, and that's a perfectly reasonable tradeoff.
 /// While that is doable, I believe it's very unlikely the caller will have specific remedies for
 /// specific SQLite errors, so for simplicity I've made the initializer return an optional ``SQLiteStorageEngine``.
-public actor SQLiteStorageEngine<KeyType: SQLiteKeyType>: StorageEngine where KeyType.Datatype: Equatable {
-    
-    public typealias Key = SQLiteStorageKey<KeyType>
+public actor SQLiteStorageEngine<Key: StorageKey>: StorageEngine where Key.KeyType: SQLite.Value & Hashable & Sendable, Key.KeyType.Datatype: Equatable {
     public typealias Value = Data
     
     private let storageTable = Table("data")
-    private let keyRow: Expression<KeyType>
+    private let keyRow: Expression<Key.KeyType>
     private let connection: Connection
 
     /// A directory on the filesystem where your ``StorageEngine``s data will be stored.
@@ -48,7 +46,7 @@ public actor SQLiteStorageEngine<KeyType: SQLiteKeyType>: StorageEngine where Ke
     ///  `.documents(appendingPath:)`, `.caches(appendingPath:)`, and more.
     public init?(directory: FileManager.Directory, databaseFilename filename: String = "data") {
         self.directory = directory
-        self.keyRow = Expression<KeyType>("key")
+        self.keyRow = Expression<Key.KeyType>("key")
 
         do {
             if !Self.directoryExists(atURL: directory.url) {

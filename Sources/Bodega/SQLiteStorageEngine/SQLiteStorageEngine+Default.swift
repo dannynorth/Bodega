@@ -1,6 +1,6 @@
 import SQLite
 
-public extension SQLiteStorageEngine where KeyType == String {
+public extension SQLiteStorageEngine where Key == String {
     /// An ``SQLiteStorageEngine`` located in the platform-specific default storage directory.
     ///
     /// Equivalent to:
