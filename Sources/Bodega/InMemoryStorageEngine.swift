@@ -1,6 +1,6 @@
 import Foundation
 
-public actor InMemoryStorageEngine<Key: StorageKey, Value>: StorageEngine {
+public actor InMemoryStorageEngine<Key: StorageKey, Value: Sendable>: StorageEngine {
     
     private struct InMemoryValue {
         let creationDate: Date

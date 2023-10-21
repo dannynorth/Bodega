@@ -16,7 +16,7 @@ import Foundation
 /// and initialize ``ObjectStorage`` with that storage.
 public protocol StorageEngine<Key, Value>: Actor {
     associatedtype Key: StorageKey
-    associatedtype Value
+    associatedtype Value: Sendable
     
     /// Write a single value to the engine associated with the provided key
     ///
