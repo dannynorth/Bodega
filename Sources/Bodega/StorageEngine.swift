@@ -1,5 +1,24 @@
 import Foundation
 
+public protocol ReadOnlyStorageEngine<Key, Value>: Actor {
+    associatedtype Key: StorageKey
+    associatedtype Value: Sendable
+    
+    func read(key: Key) async throws -> Value?
+    func readKeysAndValues(keys: [Key]) async throws -> [(key: Key, value: Value)]
+    func readAllValues() async throws -> [Value]
+    func readAllKeysAndValues() async throws -> [(key: Key, value: Value)]
+    
+
+    func keyExists(_ key: Key) async throws -> Bool
+    func keysExist(_ keys: [Key]) async throws -> [Key]
+    func keyCount() async throws -> Int
+    func allKeys() async throws -> [Key]
+
+    func createdAt(key: Key) async throws -> Date?
+    func updatedAt(key: Key) async throws -> Date?
+}
+
 /// A ``StorageEngine`` represents a data storage mechanism for saving and persisting data.
 ///
 /// A ``StorageEngine`` is a construct you can build that plugs into ``ObjectStorage``
@@ -14,9 +33,7 @@ import Foundation
 /// If you have your own way of storing data then you can refer to ``DiskStorageEngine`` and ``SQLiteStorageEngine``
 /// for inspiration, but all you need to do is conform to the ``StorageEngine`` protocol
 /// and initialize ``ObjectStorage`` with that storage.
-public protocol StorageEngine<Key, Value>: Actor {
-    associatedtype Key: StorageKey
-    associatedtype Value: Sendable
+public protocol StorageEngine<Key, Value>: ReadOnlyStorageEngine {
     
     /// Write a single value to the engine associated with the provided key
     ///
@@ -35,22 +52,9 @@ public protocol StorageEngine<Key, Value>: Actor {
     /// - throws: May throw an error if any of the write attempts fails
     func write(_ keysAndValues: [(key: Key, value: Value)]) async throws
 
-    func read(key: Key) async throws -> Value?
-    func readKeysAndValues(keys: [Key]) async throws -> [(key: Key, value: Value)]
-    func readAllValues() async throws -> [Value]
-    func readAllKeysAndValues() async throws -> [(key: Key, value: Value)]
-
     func remove(key: Key) async throws
     func remove(keys: [Key]) async throws
     func removeAllValues() async throws
-
-    func keyExists(_ key: Key) async throws -> Bool
-    func keysExist(_ keys: [Key]) async throws -> [Key]
-    func keyCount() async throws -> Int
-    func allKeys() async throws -> [Key]
-
-    func createdAt(key: Key) async throws -> Date?
-    func updatedAt(key: Key) async throws -> Date?
 }
 
 /*
