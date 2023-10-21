@@ -19,12 +19,12 @@ public actor KeyErasedStorageEngine<Key: StorageKey, Inner: StorageEngine>: Stor
     }
     
     public func write(_ value: Value, key: Key) async throws {
-        try await engine.write(value, key: Inner.Key(key))
+        try await engine.write(value, key: try Inner.Key(key))
     }
     
     public func write(_ keysAndValues: [(key: Key, value: Value)]) async throws {
         try await engine.write(keysAndValues.map {
-            (Inner.Key($0), $1)
+            (try Inner.Key($0), $1)
         })
     }
     
@@ -33,8 +33,8 @@ public actor KeyErasedStorageEngine<Key: StorageKey, Inner: StorageEngine>: Stor
     }
     
     public func readKeysAndValues(keys: [Key]) async throws -> [(key: Key, value: Value)] {
-        return try await engine.readKeysAndValues(keys: keys.map { Inner.Key($0) })
-            .map { (Key($0), $1)}
+        return try await engine.readKeysAndValues(keys: keys.map { try Inner.Key($0) })
+            .map { (try Key($0), $1)}
     }
     
     public func readAllValues() async throws -> [Value] {
@@ -43,7 +43,7 @@ public actor KeyErasedStorageEngine<Key: StorageKey, Inner: StorageEngine>: Stor
     
     public func readAllKeysAndValues() async throws -> [(key: Key, value: Value)] {
         return try await engine.readAllKeysAndValues().map {
-            (Key($0), $1)
+            (try Key($0), $1)
         }
     }
     
@@ -52,7 +52,7 @@ public actor KeyErasedStorageEngine<Key: StorageKey, Inner: StorageEngine>: Stor
     }
     
     public func remove(keys: [Key]) async throws {
-        try await engine.remove(keys: keys.map { Inner.Key($0) })
+        try await engine.remove(keys: keys.map { try Inner.Key($0) })
     }
     
     public func removeAllValues() async throws {
@@ -60,12 +60,12 @@ public actor KeyErasedStorageEngine<Key: StorageKey, Inner: StorageEngine>: Stor
     }
     
     public func keyExists(_ key: Key) async throws -> Bool {
-        return try await engine.keyExists(Inner.Key(key))
+        return try await engine.keyExists(try Inner.Key(key))
     }
     
     public func keysExist(_ keys: [Key]) async throws -> [Key] {
-        return try await engine.keysExist(keys.map { Inner.Key($0) })
-            .map { Key($0) }
+        return try await engine.keysExist(keys.map { try Inner.Key($0) })
+            .map { try Key($0) }
     }
     
     public func keyCount() async throws -> Int {
@@ -74,15 +74,15 @@ public actor KeyErasedStorageEngine<Key: StorageKey, Inner: StorageEngine>: Stor
     
     public func allKeys() async throws -> [Key] {
         return try await engine.allKeys()
-            .map { Key($0) }
+            .map { try Key($0) }
     }
     
     public func createdAt(key: Key) async throws -> Date? {
-        return try await engine.createdAt(key: Inner.Key(key))
+        return try await engine.createdAt(key: try Inner.Key(key))
     }
     
     public func updatedAt(key: Key) async throws -> Date? {
-        return try await engine.updatedAt(key: Inner.Key(key))
+        return try await engine.updatedAt(key: try Inner.Key(key))
     }
     
 }

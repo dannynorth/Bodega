@@ -34,7 +34,7 @@ public actor DiskStorageEngine<Key: StorageKey>: StorageEngine where Key.KeyType
             .replacingOccurrences(of: "=", with: "-")
     }
     
-    private func buildKey(_ sanitized: String) -> Key? {
+    private func buildKey(_ sanitized: String) throws -> Key? {
         guard let data = Data(base64Encoded: sanitized.replacingOccurrences(of: "-", with: "=")) else {
             return nil
         }
@@ -43,7 +43,7 @@ public actor DiskStorageEngine<Key: StorageKey>: StorageEngine where Key.KeyType
             return nil
         }
         
-        return Key(rawKey: plainText)
+        return try Key(rawKey: plainText)
     }
 
     /// Writes `Data` to disk based on the associated ``Key``.
@@ -190,7 +190,7 @@ public actor DiskStorageEngine<Key: StorageKey>: StorageEngine where Key.KeyType
             let directoryContents = try FileManager.default.contentsOfDirectory(at: self.directory.url, includingPropertiesForKeys: nil)
             let fileOnlyKeys = directoryContents.lazy.filter({ !$0.hasDirectoryPath }).map(\.lastPathComponent)
 
-            return fileOnlyKeys.compactMap { self.buildKey($0) }
+            return fileOnlyKeys.compactMap { try? self.buildKey($0) }
         } catch {
             return []
         }

@@ -164,7 +164,7 @@ public actor SQLiteStorageEngine<Key: StorageKey>: StorageEngine where Key.KeyTy
             .limit(keys.count)
 
         return try self.connection.prepare(query)
-            .map({ (key: Key(rawKey: $0[self.keyRow]), value: $0[Self.expressions.dataRow]) })
+            .map({ (key: try Key(rawKey: $0[self.keyRow]), value: $0[Self.expressions.dataRow]) })
     }
 
     /// Reads all the `[Data]` located in the database.
@@ -189,7 +189,7 @@ public actor SQLiteStorageEngine<Key: StorageKey>: StorageEngine where Key.KeyTy
         let query = self.storageTable.select(self.keyRow, Self.expressions.dataRow)
         
         return try self.connection.prepare(query)
-            .map({ (key: Key(rawKey: $0[self.keyRow]), value: $0[Self.expressions.dataRow]) })
+            .map({ (key: try Key(rawKey: $0[self.keyRow]), value: $0[Self.expressions.dataRow]) })
     }
 
     /// Removes `Data` from disk based on the associated ``Key``.
@@ -241,7 +241,7 @@ public actor SQLiteStorageEngine<Key: StorageKey>: StorageEngine where Key.KeyTy
             .filter(rawKeys.contains(self.keyRow))
         
         return try self.connection.prepare(query)
-            .map({ Key(rawKey: $0[self.keyRow]) })
+            .map({ try Key(rawKey: $0[self.keyRow]) })
     }
 
     /// Iterates through the database to find the total number of `Data` items.
@@ -259,7 +259,7 @@ public actor SQLiteStorageEngine<Key: StorageKey>: StorageEngine where Key.KeyTy
     public func allKeys() throws -> [Key] {
         let query = self.storageTable.select(self.keyRow)
         return try self.connection.prepare(query)
-            .map({ Key(rawKey: $0[self.keyRow]) })
+            .map({ try Key(rawKey: $0[self.keyRow]) })
     }
 
     /// Returns the date of creation for the `Data` item matching the ``Key``, if it exists.

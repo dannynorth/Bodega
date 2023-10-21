@@ -20,10 +20,10 @@ public actor StorageEngineMigrator<Old: StorageEngine, New: StorageEngine> {
     private let old: Old
     private let new: New
     
-    private let keyTranslator: (Old.Key) -> New.Key
+    private let keyTranslator: (Old.Key) throws -> New.Key
     private let valueTranslator: (Old.Value) -> New.Value
     
-    public init(from old: Old, to new: New, migrateKey: @escaping (Old.Key) -> New.Key, migrateValue: @escaping (Old.Value) -> New.Value) {
+    public init(from old: Old, to new: New, migrateKey: @escaping (Old.Key) throws -> New.Key, migrateValue: @escaping (Old.Value) -> New.Value) {
         self.old = old
         self.new = new
         self.keyTranslator = migrateKey
@@ -44,12 +44,12 @@ public actor StorageEngineMigrator<Old: StorageEngine, New: StorageEngine> {
     
     @_disfavoredOverload
     public init(from old: Old, to new: New) where Old.Key.KeyType == New.Key.KeyType, Old.Value == New.Value {
-        self.init(from: old, to: new, migrateKey: { New.Key($0) }, migrateValue: { $0 })
+        self.init(from: old, to: new, migrateKey: { try New.Key($0) }, migrateValue: { $0 })
     }
     
     @_disfavoredOverload
     public init(from old: Old, to new: New, migrateValue: @escaping (Old.Value) -> New.Value) where Old.Key.KeyType == New.Key.KeyType {
-        self.init(from: old, to: new, migrateKey: { New.Key($0) }, migrateValue: migrateValue)
+        self.init(from: old, to: new, migrateKey: { try New.Key($0) }, migrateValue: migrateValue)
     }
     
     public func migrate(options: Options) async throws {
@@ -68,7 +68,7 @@ public actor StorageEngineMigrator<Old: StorageEngine, New: StorageEngine> {
         var newKeysAndValues: [(New.Key, New.Value)] = []
         
         for (oldKey, oldValue) in allOldKeysAndValues {
-            let newKey = keyTranslator(oldKey)
+            let newKey = try keyTranslator(oldKey)
             let newValue = valueTranslator(oldValue)
             if allExistingKeys.contains(newKey), let existingValue = try await new.read(key: newKey) {
                 let mergeResult = options.mergeExistingValues(existingValue, newValue)
@@ -96,7 +96,7 @@ public actor StorageEngineMigrator<Old: StorageEngine, New: StorageEngine> {
         for oldKey in allKeys {
             guard let oldValue = try await old.read(key: oldKey) else { continue }
             
-            let newKey = keyTranslator(oldKey)
+            let newKey = try keyTranslator(oldKey)
             let newValue = valueTranslator(oldValue)
             
             if let existing = try await new.read(key: newKey) {

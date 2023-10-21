@@ -5,13 +5,13 @@ public protocol StorageKey: Hashable, Sendable {
     
     var rawKey: KeyType { get }
     
-    init(rawKey: KeyType)
+    init(rawKey: KeyType) throws
 }
 
 extension StorageKey {
     
-    public init<Other: StorageKey>(_ other: Other) where Other.KeyType == KeyType {
-        self.init(rawKey: other.rawKey)
+    public init<Other: StorageKey>(_ other: Other) throws where Other.KeyType == KeyType {
+        try self.init(rawKey: other.rawKey)
     }
     
 }
@@ -32,6 +32,19 @@ extension Int: StorageKey {
     
     public init(rawKey: Int) {
         self = rawKey
+    }
+    
+}
+
+extension UUID: StorageKey {
+    
+    public var rawKey: String { uuidString }
+    
+    public init(rawKey: String) throws {
+        guard let uuid = UUID(uuidString: rawKey) else {
+            throw CocoaError(.coderInvalidValue, userInfo: ["rawKey": rawKey])
+        }
+        self = uuid
     }
     
 }
