@@ -2,19 +2,19 @@ import Foundation
 
 public struct DiskStorageKey: StorageKey, ExpressibleByStringLiteral {
     
-    public let rawValue: String
+    public let rawKey: String
     
     internal let sanitizedValue: String
     
-    public init(_ value: String) {
-        self.rawValue = value
-        self.sanitizedValue = Data(value.utf8)
+    public init(rawKey: String) {
+        self.rawKey = rawKey
+        self.sanitizedValue = Data(rawKey.utf8)
             .base64EncodedString()
             .replacingOccurrences(of: "=", with: "-")
     }
     
     public init(stringLiteral value: String) {
-        self.init(value)
+        self.init(rawKey: value)
     }
     
     internal init?(sanitized: String) {
@@ -27,7 +27,7 @@ public struct DiskStorageKey: StorageKey, ExpressibleByStringLiteral {
         }
         
         self.sanitizedValue = sanitized
-        self.rawValue = plainText
+        self.rawKey = plainText
     }
     
 }

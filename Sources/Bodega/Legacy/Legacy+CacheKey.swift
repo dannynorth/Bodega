@@ -10,8 +10,12 @@ extension Legacy {
     /// a consistent UUID-formatted MD5 version of the URL string as the key
     /// to ensure it is file system safe.
     public struct CacheKey: Codable, Equatable, Hashable, Sendable, StorageKey {
+        public typealias KeyType = String
+        
         /// The `String` representation of your `CacheKey`.
         public let value: String
+        
+        public var rawKey: String { rawValue }
         
         /// The `String` that was passed in to any initializer, regardless of whether it was hashed afterwards or not.
         /// Currently this is used in ``StorageEngine``s that are not file system based
@@ -47,6 +51,10 @@ extension Legacy {
         public init(verbatim value: String) {
             self.rawValue = value
             self.value = value
+        }
+        
+        public init(rawKey: String) {
+            self.init(verbatim: rawKey)
         }
     }
     

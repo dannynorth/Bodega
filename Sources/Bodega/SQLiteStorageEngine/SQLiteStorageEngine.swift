@@ -77,7 +77,7 @@ public actor SQLiteStorageEngine<KeyType: SQLiteKeyType>: StorageEngine where Ke
     ///   - key: A ``Key`` for matching `Data`.
     public func write(_ data: Data, key: Key) throws {
         var values = [
-            self.keyRow <- key.value,
+            self.keyRow <- key.rawKey,
             Self.expressions.dataRow <- data,
             Self.expressions.updatedAtRow <- Date()
         ]
@@ -90,7 +90,7 @@ public actor SQLiteStorageEngine<KeyType: SQLiteKeyType>: StorageEngine where Ke
         if try self.keyExists(key) {
             try self.connection.run(
                 self.storageTable
-                    .filter(self.keyRow == key.value)
+                    .filter(self.keyRow == key.rawKey)
                     .update(values)
             )
         } else {
@@ -109,7 +109,7 @@ public actor SQLiteStorageEngine<KeyType: SQLiteKeyType>: StorageEngine where Ke
         guard !keysAndValues.isEmpty else { return }
         
         let values = keysAndValues.map({[
-            self.keyRow <- $0.key.value,
+            self.keyRow <- $0.key.rawKey,
             Self.expressions.dataRow <- $0.value,
             Self.expressions.updatedAtRow <- Date()
         ]})
@@ -126,7 +126,7 @@ public actor SQLiteStorageEngine<KeyType: SQLiteKeyType>: StorageEngine where Ke
     public func read(key: Key) throws -> Data? {
         let query = self.storageTable
             .select(self.keyRow, Self.expressions.dataRow)
-            .filter(self.keyRow == key.value)
+            .filter(self.keyRow == key.rawKey)
             .limit(1)
 
         return try self.connection.pluck(query)?[Self.expressions.dataRow]
@@ -139,7 +139,7 @@ public actor SQLiteStorageEngine<KeyType: SQLiteKeyType>: StorageEngine where Ke
     /// and an `[]` if there is no `Data` matching the `keys` passed in.
     public func read(keys: [Key]) throws -> [Data] {
         let query = self.storageTable.select(Self.expressions.dataRow)
-            .where(keys.map(\.value).contains(self.keyRow))
+            .where(keys.map(\.rawKey).contains(self.keyRow))
             .limit(keys.count)
 
         return try self.connection.prepare(query)
@@ -162,11 +162,11 @@ public actor SQLiteStorageEngine<KeyType: SQLiteKeyType>: StorageEngine where Ke
     /// and an empty array if there are no `Data` items matching the `keys` passed in.
     public func readKeysAndValues(keys: [Key]) throws -> [(key: Key, value: Data)] {
         let query = self.storageTable.select(self.keyRow, Self.expressions.dataRow)
-            .where(keys.map(\.value).contains(self.keyRow))
+            .where(keys.map(\.rawKey).contains(self.keyRow))
             .limit(keys.count)
 
         return try self.connection.prepare(query)
-            .map({ (key: Key(value: $0[self.keyRow]), value: $0[Self.expressions.dataRow]) })
+            .map({ (key: Key(rawKey: $0[self.keyRow]), value: $0[Self.expressions.dataRow]) })
     }
 
     /// Reads all the `[Data]` located in the database.
@@ -191,14 +191,14 @@ public actor SQLiteStorageEngine<KeyType: SQLiteKeyType>: StorageEngine where Ke
         let query = self.storageTable.select(self.keyRow, Self.expressions.dataRow)
         
         return try self.connection.prepare(query)
-            .map({ (key: Key(value: $0[self.keyRow]), value: $0[Self.expressions.dataRow]) })
+            .map({ (key: Key(rawKey: $0[self.keyRow]), value: $0[Self.expressions.dataRow]) })
     }
 
     /// Removes `Data` from disk based on the associated ``Key``.
     /// - Parameters:
     ///   - key: A ``Key`` for finding the `Data` to remove.
     public func remove(key: Key) throws {
-        let deleteQuery = self.storageTable.filter(self.keyRow == key.value)
+        let deleteQuery = self.storageTable.filter(self.keyRow == key.rawKey)
         try self.connection.run(deleteQuery.delete())
     }
 
@@ -209,7 +209,7 @@ public actor SQLiteStorageEngine<KeyType: SQLiteKeyType>: StorageEngine where Ke
         guard !keys.isEmpty else { return }
 
         let deleteQuery = self.storageTable.select(self.keyRow, Self.expressions.dataRow)
-            .where(keys.map(\.value).contains(self.keyRow))
+            .where(keys.map(\.rawKey).contains(self.keyRow))
             .limit(keys.count)
 
         try self.connection.run(deleteQuery.delete())
@@ -226,7 +226,7 @@ public actor SQLiteStorageEngine<KeyType: SQLiteKeyType>: StorageEngine where Ke
     public func keyExists(_ key: Key) throws -> Bool {
         let query = self.storageTable
             .select(self.keyRow)
-            .filter(self.keyRow == key.value)
+            .filter(self.keyRow == key.rawKey)
             .limit(1)
 
         return try self.connection.pluck(query)?[self.keyRow] != nil
@@ -236,14 +236,14 @@ public actor SQLiteStorageEngine<KeyType: SQLiteKeyType>: StorageEngine where Ke
     /// - Parameter keys: The list of keys to check for existence.
     /// - Returns: An array of keys that exist. This value is always a subset of the `keys` passed in.
     public func keysExist(_ keys: [Key]) throws -> [Key] {
-        let rawKeys = keys.map(\.value)
+        let rawKeys = keys.map(\.rawKey)
         
         let query = self.storageTable
             .select(self.keyRow)
             .filter(rawKeys.contains(self.keyRow))
         
         return try self.connection.prepare(query)
-            .map({ Key(value: $0[self.keyRow]) })
+            .map({ Key(rawKey: $0[self.keyRow]) })
     }
 
     /// Iterates through the database to find the total number of `Data` items.
@@ -261,7 +261,7 @@ public actor SQLiteStorageEngine<KeyType: SQLiteKeyType>: StorageEngine where Ke
     public func allKeys() throws -> [Key] {
         let query = self.storageTable.select(self.keyRow)
         return try self.connection.prepare(query)
-            .map({ Key(value: $0[self.keyRow]) })
+            .map({ Key(rawKey: $0[self.keyRow]) })
     }
 
     /// Returns the date of creation for the `Data` item matching the ``Key``, if it exists.
@@ -271,7 +271,7 @@ public actor SQLiteStorageEngine<KeyType: SQLiteKeyType>: StorageEngine where Ke
     public func createdAt(key: Key) throws -> Date? {
         let query = self.storageTable
             .select(Self.expressions.createdAtRow)
-            .filter(self.keyRow == key.value)
+            .filter(self.keyRow == key.rawKey)
             .limit(1)
         
         return try self.connection.pluck(query)?[Self.expressions.createdAtRow]
@@ -284,7 +284,7 @@ public actor SQLiteStorageEngine<KeyType: SQLiteKeyType>: StorageEngine where Ke
     public func updatedAt(key: Key) throws -> Date? {
         let query = self.storageTable
             .select(Self.expressions.updatedAtRow)
-            .filter(self.keyRow == key.value)
+            .filter(self.keyRow == key.rawKey)
             .limit(1)
 
         return try self.connection.pluck(query)?[Self.expressions.updatedAtRow]
